@@ -41,7 +41,7 @@ Please be advised that the public instance is subject to rate limiting and cold-
 ### Installation
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/kuro.git
+   git clone https://github.com/aryaniiil/kuro.git
    ```
 2. Install dependencies:
    ```bash
