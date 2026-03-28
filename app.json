@@ -6,7 +6,8 @@
     "version": "1.0.0",
     "plugins": [
       "expo-router",
-      "expo-video"
+      "expo-video",
+      "expo-font"
     ],
     "orientation": "portrait",
     "icon": "./assets/appico.png",

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { View, Text, TouchableOpacity, ScrollView, useWindowDimensions, Modal, ActivityIndicator, TouchableWithoutFeedback, Pressable, Image } from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, useWindowDimensions, Modal, ActivityIndicator, TouchableWithoutFeedback, Pressable, Image, BackHandler } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { ArrowLeft, Settings, Play, Pause, RotateCcw, RotateCw, BookmarkPlus, Subtitles, Maximize, Minimize, X, Check, ChevronRight } from "lucide-react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -600,6 +600,20 @@ export default function Player() {
         }
     };
 
+    const handleBack = useCallback(() => {
+        if (isLandscape) {
+            toggleOrientation();
+            return true;
+        }
+        router.back();
+        return true;
+    }, [isLandscape]);
+
+    useEffect(() => {
+        const backHandler = BackHandler.addEventListener('hardwareBackPress', handleBack);
+        return () => backHandler.remove();
+    }, [handleBack]);
+
     // Build settings menu options
     const serverCategories = ['sub', 'dub', 'raw'];
     const availableServers = servers ? serverCategories.filter(cat =>
@@ -772,7 +786,7 @@ export default function Player() {
                     <View className={`flex-row items-center justify-between z-20 w-full pointer-events-box-none ${isLandscape ? 'px-6 pt-6' : 'p-4'}`} pointerEvents="box-none">
                         {isLandscape && <LinearGradient colors={['rgba(0,0,0,0.8)', 'transparent']} className="absolute top-0 left-0 right-0 h-32 z-[-1]" pointerEvents="none" />}
                         <View className="flex-row items-center" pointerEvents="box-none">
-                            <TouchableOpacity onPress={() => router.back()} className={`items-center justify-center rounded-full mr-2 ${isLandscape ? 'p-2' : 'w-10 h-10 bg-black/30'}`}>
+                            <TouchableOpacity onPress={handleBack} className={`items-center justify-center rounded-full mr-2 ${isLandscape ? 'p-2' : 'w-10 h-10 bg-black/30'}`}>
                                 <ArrowLeft size={isLandscape ? 28 : 24} color="white" />
                             </TouchableOpacity>
                             {isLandscape && (

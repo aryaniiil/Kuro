@@ -2,6 +2,13 @@
 
 Kuro is a high-performance, modern anime streaming application built with React Native and Expo. It provides a seamless experience for discovering, tracking, and watching anime content with a focus on speed and visual excellence.
 
+## Preview
+
+<div align="center">
+  <img src="assets/490_1x_shots_so.png" width="45%" alt="Mobile Preview 1" />
+  <img src="assets/978_1x_shots_so.png" width="45%" alt="Mobile Preview 2" />
+</div>
+
 ## API Integration Note
 
 This application currently utilizes a free public instance of the backend API hosted at:

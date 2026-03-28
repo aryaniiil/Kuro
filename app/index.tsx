@@ -1,49 +1,62 @@
-import { ActivityIndicator, Image, Text, View } from "react-native";
+import { Text, View, Animated, Easing } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
-
-const FUNNY_LINES = [
-    "Warming up the ramen-powered servers...",
-    "Negotiating with anime gods for no filler arcs...",
-    "Polishing subtitles so they look dramatic...",
-    "Checking if power levels are over 9000...",
-    "Summoning your next obsession..."
-];
+import { useEffect, useRef } from "react";
 
 export default function StartScreen() {
     const router = useRouter();
-    const [lineIndex, setLineIndex] = useState(0);
-    const [dotCount, setDotCount] = useState(0);
+    const spinValue = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
-        const lineTimer = setInterval(() => {
-            setLineIndex((prev) => (prev + 1) % FUNNY_LINES.length);
-        }, 1500);
+        // Continuous Buffer Rotation
+        Animated.loop(
+            Animated.timing(spinValue, {
+                toValue: 1,
+                duration: 1500,
+                easing: Easing.bezier(0.4, 0, 0.2, 1),
+                useNativeDriver: true,
+            })
+        ).start();
 
-        const dotsTimer = setInterval(() => {
-            setDotCount((prev) => (prev + 1) % 4);
-        }, 350);
+        const navTimer = setTimeout(() => router.replace("/home"), 4500);
+        return () => clearTimeout(navTimer);
+    }, []);
 
-        const navTimer = setTimeout(() => {
-            router.replace("/home");
-        }, 4200);
-
-        return () => {
-            clearInterval(lineTimer);
-            clearInterval(dotsTimer);
-            clearTimeout(navTimer);
-        };
-    }, [router]);
+    const spin = spinValue.interpolate({
+        inputRange: [0, 1],
+        outputRange: ["0deg", "360deg"],
+    });
 
     return (
-        <View className="flex-1 bg-[#09090b] items-center justify-center px-8">
+        <View className="flex-1 bg-black items-center justify-center">
             <StatusBar style="light" />
-            <Image source={require("../assets/logo.png")} className="w-20 h-20 mb-6" resizeMode="contain" />
-            <Text className="text-white text-2xl font-bold tracking-tight mb-6">Kuro</Text>
-            <ActivityIndicator size="large" color="#fafafa" />
-            <Text className="text-zinc-300 text-sm mt-5 text-center min-h-[40px]">{FUNNY_LINES[lineIndex]}</Text>
-            <Text className="text-zinc-500 text-xs mt-2">Loading your next episode{".".repeat(dotCount)}</Text>
+
+            {/* Central Glass Card */}
+            <View className="bg-white/5 border border-white/10 rounded-[50px] p-16 items-center">
+
+                {/* Soft Buffer Ring */}
+                <Animated.View
+                    style={{ transform: [{ rotate: spin }] }}
+                    className="w-12 h-12 rounded-full border-2 border-white/10 border-t-white/80 mb-10"
+                />
+
+                {/* Elegant Lowercase Logo */}
+                <Text style={{ fontFamily: 'Poppins-Light' }} className="text-white text-4xl tracking-[10px] ml-[10px]">
+                    kuro
+                </Text>
+
+                {/* Sub-status */}
+                <Text style={{ fontFamily: 'Poppins-Light' }} className="text-white/20 text-[10px] tracking-[3px] mt-6">
+                    fetching your world...
+                </Text>
+            </View>
+
+            {/* Bottom Signature */}
+            <View className="absolute bottom-10">
+                <Text style={{ fontFamily: 'Poppins-Thin' }} className="text-white/10 text-[9px] tracking-[5px]">
+                    made by aryaniiil
+                </Text>
+            </View>
         </View>
     );
 }

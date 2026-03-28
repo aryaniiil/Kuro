@@ -1,7 +1,23 @@
 import "../global.css";
 import { Stack } from "expo-router";
+import { 
+    useFonts, 
+    Poppins_300Light, 
+    Poppins_100Thin, 
+    Poppins_400Regular, 
+    Poppins_700Bold 
+} from '@expo-google-fonts/poppins';
 
 export default function RootLayout() {
+    const [fontsLoaded] = useFonts({
+        'Poppins-Light': Poppins_300Light,
+        'Poppins-Thin': Poppins_100Thin,
+        'Poppins-Regular': Poppins_400Regular,
+        'Poppins-Bold': Poppins_700Bold,
+    });
+
+    if (!fontsLoaded) return null;
+
     return (
         <Stack screenOptions={{
             headerShown: false,
