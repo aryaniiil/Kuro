@@ -15,7 +15,7 @@ This application currently utilizes a free public instance of the backend API ho
 https://anime-scraper-v2.vercel.app/
 
 The source code for this API can be found at (fork and deploy ur own on vercel): 
-[GitHub: aryaniiil/anime-api](https://github.com/aryaniiil/anime-api-v2)
+[GitHub: aryaniiil/anime-api](https://github.com/aryaniiil/anime-scraper-v2)
 
 Please be advised that the public instance is subject to rate limiting and cold-starts. For production use or a more reliable experience, it is strongly recommended to host your own instance of the API following the documentation in the repository linked above.
 
