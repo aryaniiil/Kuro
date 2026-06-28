@@ -8,7 +8,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import Slider from '@react-native-community/slider';
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { fetchAnimeInfo, fetchAnimeEpisodes, fetchEpisodeServers, fetchEpisodeSources, fetchM3U8AndParseQualities } from "../src/api";
+import { fetchAnimeInfo, fetchAnimeEpisodes, fetchEpisodeServers, fetchEpisodeSources } from "../src/api";
 import { storage } from "../src/hooks/useStorage";
 
 
@@ -156,11 +156,11 @@ export default function Player() {
     const [duration, setDuration] = useState(1);
     const [showSettings, setShowSettings] = useState(false);
     const [showSubs, setShowSubs] = useState(false);
-    const [isBuffering, setIsBuffering] = useState(true);
+    const [isBuffering, setIsBuffering] = useState(false);
     const [isLoadingSource, setIsLoadingSource] = useState(true);
     const lastTap = useRef<{ time: number, side: string } | null>(null);
     const [seekRipple, setSeekRipple] = useState<{ visible: boolean, side: 'left' | 'right', text: string }>({ visible: false, side: 'right', text: '' });
-    const rippleTimeout = useRef<NodeJS.Timeout | null>(null);
+    const rippleTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Prevent state updates/player replace when component unmounts
     const isMounted = useRef(true);
@@ -223,6 +223,7 @@ export default function Player() {
     const [servers, setServers] = useState<any>(null);
     const [selectedServer, setSelectedServer] = useState("hd-1");
     const [selectedCategory, setSelectedCategory] = useState("sub");
+    const [serverDropdownOpen, setServerDropdownOpen] = useState(false);
 
     // Episodes Pagination
     const [selectedChunk, setSelectedChunk] = useState(0);
@@ -287,75 +288,48 @@ export default function Player() {
     // Load episode sources for a given episodeId
     const loadEpisodeSources = useCallback(async (episodeId: string, server = "hd-1", category = "sub") => {
         setIsLoadingSource(true);
-        setIsBuffering(true);
         console.log("[Player] Loading sources for:", episodeId, "server:", server, "category:", category);
 
-        let sourcesData = null;
-        let retries = 0;
-        while (!sourcesData && isMounted.current && retries < 15) {
-            const temp = await fetchEpisodeSources(id as string, episodeId, server, category);
+        const temp = await fetchEpisodeSources(id as string, episodeId, server, category);
+        console.log("[Player] fetchEpisodeSources result:", temp ? "got data" : "null");
 
-            // Validate that we actually got a stream URL, not just a successful empty JSON payload
-            const m3u8Src = temp?.sources?.find((s: any) => s.isM3U8) || temp?.sources?.[0];
-            if (temp && temp.sources && temp.sources.length > 0 && m3u8Src?.url) {
-                sourcesData = temp;
-            } else {
-                console.log(`[Player] Scraping busy or empty URL, retrying... (${++retries})`);
-                await new Promise(resolve => setTimeout(resolve, 2500));
-            }
-        }
-
-        if (retries >= 15) {
-            console.error("[Player] Failed to load sources after 15 retries");
+        if (!temp || !temp.sources?.length) {
+            console.error("[Player] Failed to load sources");
             setIsLoadingSource(false);
             setIsBuffering(false);
             return;
         }
 
-        if (!isMounted.current || !sourcesData) return;
+        if (!isMounted.current) return;
         console.log("[Player] Sources data received");
 
-        setIntro(sourcesData.intro || null);
-        setOutro(sourcesData.outro || null);
+        setIntro(temp.intro || null);
+        setOutro(temp.outro || null);
 
-        // Build headers for the video player from API response + defaults
         const hdrs: Record<string, string> = {
             'Referer': 'https://megacloud.blog/',
-            'Origin': 'https://megacloud.blog',
-            'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36',
-            ...(sourcesData.headers || {}),
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36',
+            ...(temp.headers || {}),
         };
         sourceHeaders.current = hdrs;
         console.log("[Player] Using headers:", Object.keys(hdrs));
 
-        // Handle sources
-        if (sourcesData.sources?.length > 0) {
-            // Pick the master source
-            const m3u8Src = sourcesData.sources.find((s: any) => s.isM3U8) || sourcesData.sources[0];
+        setSources(temp.sources);
+        setCurrentQuality(temp.sources[0]?.quality || 'Auto');
+        setSelectedSourceIdx(0);
 
-            // Parse master quality URLs instead of raw source objects
-            const parsedSources = await fetchM3U8AndParseQualities(m3u8Src.url, hdrs);
-            setSources(parsedSources);
+        const playUrl = temp.sources[0].url;
+        console.log("[Player] Playing URL:", playUrl.slice(0, 80));
 
-            const defaultSrc = parsedSources[0]; // Usually 'Auto'
-            setSelectedSourceIdx(0);
-            setCurrentQuality(defaultSrc.quality);
-
-            console.log("[Player] Playing URL:", defaultSrc.url);
-
-            if (isMounted.current) {
-                player.replace({ uri: defaultSrc.url, headers: hdrs });
-                player.play();
-            }
+        if (isMounted.current) {
+            player.replace({ uri: playUrl, headers: hdrs });
+            player.play();
         }
 
-        // Handle subtitles - API uses 'tracks' or 'subtitles' field
-        const rawSubs = sourcesData.subtitles || sourcesData.tracks || [];
-        // Filter out non-subtitle tracks (like thumbnails)
+        const rawSubs = temp.subtitles || temp.tracks || [];
         const validSubs = rawSubs.filter((s: any) => s.lang && s.lang.toLowerCase() !== 'thumbnails');
         if (validSubs.length > 0) {
             setSubtitles(validSubs);
-            // Auto-select English subtitles if available
             const engIdx = validSubs.findIndex((s: any) =>
                 s.lang?.toLowerCase().includes('english')
             );
@@ -526,7 +500,7 @@ export default function Player() {
     }, []);
 
     useEffect(() => {
-        let controlsTimeout: NodeJS.Timeout;
+        let controlsTimeout: ReturnType<typeof setTimeout>;
         if (showControls && isPlaying) {
             controlsTimeout = setTimeout(() => setShowControls(false), 3000);
         }
@@ -806,9 +780,22 @@ export default function Player() {
                                 </View>
                             )}
                         </View>
-                        <TouchableOpacity onPress={() => setShowSettings(true)} className={`items-center justify-center rounded-full ${isLandscape ? 'p-2' : 'w-10 h-10 bg-black/30'}`}>
-                            <Settings size={isLandscape ? 26 : 24} color="white" />
-                        </TouchableOpacity>
+                        <View className="flex-row items-center gap-2">
+                            {/* Debug button */}
+                            <TouchableOpacity
+                                onPress={() => {
+                                    const d = `Anime: ${animeTitle}\nEp: ${currentEpisode?.number}\nServer: ${selectedServer}\nCat: ${selectedCategory}\nSources: ${sources.length}\nSubtitles: ${subtitles.length}\nBuffering: ${isBuffering}\nPlayer dur: ${duration}`;
+                                    console.log("=== DEBUG ===", d);
+                                    alert(d);
+                                }}
+                                className="items-center justify-center w-9 h-9 rounded-full bg-black/40"
+                            >
+                                <Text className="text-white text-xs font-bold">Dbg</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => setShowSettings(true)} className={`items-center justify-center rounded-full ${isLandscape ? 'p-2' : 'w-10 h-10 bg-black/30'}`}>
+                                <Settings size={isLandscape ? 26 : 24} color="white" />
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     {/* Center Play Controls */}
@@ -872,12 +859,23 @@ export default function Player() {
                                 <View className="px-2 py-0.5 border border-zinc-700 rounded">
                                     <Text className="text-[10px] font-bold text-zinc-400">{currentQuality}</Text>
                                 </View>
-                                <TouchableOpacity
-                                    onPress={() => setSelectedCategory(selectedCategory === 'sub' ? 'dub' : 'sub')}
-                                    className="px-2 py-0.5 border border-zinc-700 rounded"
-                                >
-                                    <Text className="text-[10px] font-bold text-zinc-400 uppercase">{selectedCategory}</Text>
-                                </TouchableOpacity>
+                                {servers && (() => {
+                                    const cats = ['sub', 'dub', 'raw'].filter(c => servers[c]?.length > 0);
+                                    return cats.map(cat => (
+                                        <TouchableOpacity
+                                            key={cat}
+                                            onPress={() => {
+                                                if (cat !== selectedCategory) {
+                                                    const srv = servers[cat][0]?.serverName || selectedServer;
+                                                    switchServer(srv, cat);
+                                                }
+                                            }}
+                                            className={`px-3 py-1.5 rounded-md border ${selectedCategory === cat ? 'bg-white/10 border-white/30' : 'border-zinc-700'}`}
+                                        >
+                                            <Text className={`text-xs font-bold uppercase ${selectedCategory === cat ? 'text-white' : 'text-zinc-400'}`}>{cat}</Text>
+                                        </TouchableOpacity>
+                                    ));
+                                })()}
                                 {subtitles.length > 0 && (
                                     <View className="px-2 py-0.5 border border-zinc-700 rounded">
                                         <Text className="text-[10px] font-bold text-zinc-400">CC</Text>
@@ -897,16 +895,17 @@ export default function Player() {
                         {servers && (
                             <View className="mb-8">
                                 <View className="flex-row items-center justify-between mb-4">
-                                    <Text className="text-lg font-semibold text-white">Audio & Servers</Text>
-
+                                    <Text className="text-lg font-semibold text-white">Audio</Text>
                                     {/* Sub/Dub/Raw Tabs */}
                                     <View className="flex-row bg-zinc-900 rounded-lg p-1 border border-zinc-800">
-                                        {['sub', 'dub', 'raw'].filter(cat => servers[cat] && servers[cat].length > 0).map((cat) => (
+                                        {['sub', 'dub', 'raw'].filter(cat => servers[cat]?.length > 0).map((cat) => (
                                             <TouchableOpacity
                                                 key={cat}
                                                 onPress={() => {
-                                                    const newSrv = servers[cat][0]?.serverName;
-                                                    if (newSrv) switchServer(newSrv, cat);
+                                                    if (cat !== selectedCategory) {
+                                                        const newSrv = servers[cat][0]?.serverName || selectedServer;
+                                                        switchServer(newSrv, cat);
+                                                    }
                                                 }}
                                                 className={`px-3 py-1.5 rounded-md ${selectedCategory === cat ? 'bg-zinc-700' : ''}`}
                                             >
@@ -916,25 +915,38 @@ export default function Player() {
                                     </View>
                                 </View>
 
-                                {/* Server Pills */}
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-5 px-5 flex-row">
-                                    {(servers[selectedCategory] || []).map((srv: any) => {
-                                        const isActive = selectedServer === srv.serverName;
-                                        return (
-                                            <TouchableOpacity
-                                                key={srv.serverId}
-                                                onPress={() => switchServer(srv.serverName, selectedCategory)}
-                                                className={`mr-3 px-4 py-2.5 rounded-xl border ${isActive ? 'bg-white/10 border-white/30' : 'bg-zinc-800/40 border-zinc-800'}`}
-                                            >
-                                                <Text className={`text-sm font-semibold capitalize ${isActive ? 'text-white' : 'text-zinc-300'}`}>
-                                                    {srv.serverName}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        );
-                                    })}
-                                    {/* Empty flex spacer to ensure last item is fully visible when scrolling */}
-                                    <View className="w-5" />
-                                </ScrollView>
+                                {/* Server Dropdown Trigger */}
+                                <TouchableOpacity
+                                    onPress={() => setServerDropdownOpen(!serverDropdownOpen)}
+                                    className="flex-row items-center justify-between bg-zinc-900 rounded-xl border border-zinc-800 px-4 py-3.5"
+                                >
+                                    <Text className="text-sm font-semibold text-white capitalize">{selectedServer}</Text>
+                                    <Text className="text-zinc-500 text-xs">{serverDropdownOpen ? '▲' : '▼'}</Text>
+                                </TouchableOpacity>
+
+                                {/* Server Dropdown List */}
+                                {serverDropdownOpen && (
+                                    <View className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden mt-1">
+                                        {(servers[selectedCategory] || []).map((srv: any, idx: number) => {
+                                            const isActive = selectedServer === srv.serverName;
+                                            return (
+                                                <TouchableOpacity
+                                                    key={srv.serverId}
+                                                    onPress={() => {
+                                                        switchServer(srv.serverName, selectedCategory);
+                                                        setServerDropdownOpen(false);
+                                                    }}
+                                                    className={`flex-row items-center justify-between px-4 py-3.5 ${isActive ? 'bg-white/10' : ''} ${idx < servers[selectedCategory].length - 1 ? 'border-b border-zinc-800' : ''}`}
+                                                >
+                                                    <Text className={`text-sm font-semibold capitalize ${isActive ? 'text-white' : 'text-zinc-300'}`}>
+                                                        {srv.serverName}
+                                                    </Text>
+                                                    {isActive && <Check size={16} color="white" />}
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </View>
+                                )}
                             </View>
                         )}
 

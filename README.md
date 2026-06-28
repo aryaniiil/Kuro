@@ -12,10 +12,10 @@ Kuro is a high-performance, modern anime streaming application built with React 
 ## API Integration Note
 
 This application currently utilizes a free public instance of the backend API hosted at:
-https://anime-api-y650.onrender.com
+https://anime-scraper-v2.vercel.app/
 
-The source code for this API can be found at: 
-[GitHub: aryaniiil/anime-api](https://github.com/aryaniiil/anime-api)
+The source code for this API can be found at (fork and deploy ur own on vercel): 
+[GitHub: aryaniiil/anime-api](https://github.com/aryaniiil/anime-api-v2)
 
 Please be advised that the public instance is subject to rate limiting and cold-starts. For production use or a more reliable experience, it is strongly recommended to host your own instance of the API following the documentation in the repository linked above.
 
@@ -48,7 +48,7 @@ Please be advised that the public instance is subject to rate limiting and cold-
 ### Installation
 1. Clone the repository:
    ```bash
-   git clone https://github.com/aryaniiil/kuro.git
+   git clone https://github.com/aryaniiil/kuro.git .
    ```
 2. Install dependencies:
    ```bash
@@ -56,7 +56,7 @@ Please be advised that the public instance is subject to rate limiting and cold-
    ```
 3. Start the development server:
    ```bash
-   npx expo start
+   npx expo run
    ```
 
 ## Technology Stack
